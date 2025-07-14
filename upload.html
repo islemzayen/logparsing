@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Log Viewer with Vue.js</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #app {
+      display: flex;
+      width: 100%;
+    }
+
+    #sidebar {
+      width: 300px;
+      min-width: 300px;
+      max-width: 300px;
+      flex-shrink: 0;
+      background-color: #f4f4f4;
+      border-right: 1px solid #ccc;
+      padding: 10px;
+      overflow-y: auto;
+    }
+
+    #sidebar h3 {
+      margin-top: 0;
+    }
+
+    #search-box {
+      width: 100%;
+      padding: 6px;
+      margin-bottom: 10px;
+      font-size: 1rem;
+    }
+
+    #failures-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    #failures-list li button {
+      background: none;
+      border: none;
+      color: red;
+      cursor: pointer;
+      text-align: left;
+      width: 100%;
+      padding: 6px 0;
+      font-size: 0.9rem;
+    }
+
+    #main-content {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+      overflow: hidden;
+    }
+
+    #drop-zone {
+      border: 2px dashed #aaa;
+      padding: 10px;
+      text-align: center;
+      margin-bottom: 10px;
+      flex-shrink: 0;
+    }
+
+    #log-content {
+      flex-grow: 1;
+      overflow-y: auto;
+      font-family: monospace;
+      white-space: pre-wrap;
+      line-height: 1.4;
+      border-top: 1px solid #ccc;
+      padding-top: 10px;
+    }
+
+    .highlight {
+      background-color: #ffcccc;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="sidebar">
+      <h3>Failed Test Cases</h3>
+      <input type="text" id="search-box" v-model="searchTerm" placeholder="Search test case..." />
+      <ul id="failures-list">
+        <li v-if="filteredFailures.length === 0">No failed test cases found.</li>
+        <li v-for="fail in filteredFailures" :key="fail.index">
+          <button @click="scrollTo(fail.index)">
+            {{ fail.text.slice(0, 50) }}
+          </button>
+        </li>
+      </ul>
+    </div>
+
+    <div id="main-content">
+      <div id="drop-zone"
+           @dragover.prevent="onDragOver"
+           @dragleave="onDragLeave"
+           @drop.prevent="onDrop"
+           :style="{ borderColor: isDragging ? 'blue' : '#aaa' }">
+        Drop your .log file here or
+        <input type="file" @change="onFileChange" />
+      </div>
+      <div id="log-content">
+        <div v-for="(line, i) in lines"
+             :key="i"
+             :id="'line-' + i"
+             :class="{ highlight: i === highlightedIndex }">
+          {{ line.text }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { createApp } = Vue;
+
+    createApp({
+      data() {
+        return {
+          lines: [],
+          searchTerm: "",
+          highlightedIndex: null,
+          isDragging: false
+        };
+      },
+      computed: {
+        failedLines() {
+          return this.lines.filter(line =>
+            /(fail|error|exception|dbg)/i.test(line.text)
+          );
+        },
+        filteredFailures() {
+          return this.failedLines.filter(line =>
+            line.text.toLowerCase().includes(this.searchTerm.toLowerCase())
+          );
+        }
+      },
+      methods: {
+        onFileChange(event) {
+          const file = event.target.files[0];
+          if (file) this.readFile(file);
+        },
+        onDrop(event) {
+          this.isDragging = false;
+          const file = event.dataTransfer.files[0];
+          if (file) this.readFile(file);
+        },
+        onDragOver() {
+          this.isDragging = true;
+        },
+        onDragLeave() {
+          this.isDragging = false;
+        },
+        readFile(file) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const rawText = e.target.result;
+            const rawLines = rawText.split(/\r?\n/);
+            this.lines = rawLines.map((line, i) => ({
+              text: line,
+              index: i
+            }));
+          };
+          reader.readAsText(file);
+        },
+        scrollTo(index) {
+          this.highlightedIndex = index;
+          const el = document.getElementById("line-" + index);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            setTimeout(() => {
+              this.highlightedIndex = null;
+            }, 3000);
+          }
+        }
+      }
+    }).mount("#app");
+  </script>
+</body>
+</html>
